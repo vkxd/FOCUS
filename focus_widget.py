@@ -1,11 +1,3 @@
-"""
-Focus Widget - a small always-on-top desktop overlay.
-Timer ring + checklist + Local Windows Media Controls.
-
-Requirements:
-    pip install winsdk
-"""
-
 import sys
 import time
 import math
@@ -223,7 +215,7 @@ class FocusWidget:
             fill=BG_CARD, outline=BORDER, width=1,
         )
 
-        # Drag bar
+        # Drag bar / Header container
         drag_bar = tk.Frame(self.canvas, bg=BG_CARD, height=34)
         self.canvas.create_window(WIDTH // 2, 20, window=drag_bar, width=WIDTH - 20, height=34)
         drag_bar.bind("<ButtonPress-1>", self._drag_start)
@@ -231,16 +223,45 @@ class FocusWidget:
 
         handle = tk.Frame(drag_bar, bg="#3a322c", width=36, height=4)
         handle.place(relx=0.5, y=4, anchor="n")
+        handle.bind("<ButtonPress-1>", self._drag_start)
+        handle.bind("<B1-Motion>", self._drag_move)
 
+        # Close Button
         close_btn = tk.Label(drag_bar, text="\u2715", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 10), cursor="hand2")
         close_btn.place(relx=1.0, y=2, anchor="ne")
         close_btn.bind("<Button-1>", lambda e: self.root.destroy())
         close_btn.bind("<Enter>", lambda e: close_btn.configure(fg=ORANGE))
         close_btn.bind("<Leave>", lambda e: close_btn.configure(fg=TEXT_MUTED))
 
+        # Settings Cog Button
+        self.settings_btn = tk.Label(drag_bar, text="⚙", bg=BG_CARD, fg=TEXT_MUTED, font=("Segoe UI", 10), cursor="hand2")
+        self.settings_btn.place(relx=1.0, x=-22, y=2, anchor="ne")
+        self.settings_btn.bind("<Button-1>", lambda e: self._toggle_settings())
+        self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.configure(fg=ORANGE))
+        self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.configure(fg=TEXT_MUTED))
+
+        # Main Content Container
+        self.main_container = tk.Frame(self.canvas, bg=BG_CARD)
+        self.canvas.create_window(WIDTH // 2, HEIGHT // 2 + 10, window=self.main_container, width=WIDTH, height=HEIGHT - 40)
+
+        # Settings Content Container
+        self.settings_container = tk.Frame(self.canvas, bg=BG_CARD)
+        
+        # Build Main View components inside main_container
+        self._build_main_view()
+        
+        # Build Settings View components inside settings_container
+        self._build_settings_view()
+
+        self.canvas.bind("<ButtonPress-1>", self._drag_start)
+        self.canvas.bind("<B1-Motion>", self._drag_move)
+
+    def _build_main_view(self):
         # Media Player
-        music_frame = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(MUSIC_X, MUSIC_Y, window=music_frame, width=WIDTH - 40)
+        music_frame = tk.Frame(self.main_container, bg=BG_CARD)
+        music_frame.place(x=0, y=10, width=WIDTH, anchor="n") # Adjusted relative layout positioning
+        # To make it safe inside main_container bounds, use pack/place securely:
+        music_frame.pack(side="top", pady=(5, 0))
 
         self.track_var = tk.StringVar(value=getattr(self, 'media_status', 'Loading...'))
         self.play_var = tk.StringVar(value="▶")
@@ -258,69 +279,102 @@ class FocusWidget:
         tk.Button(ctrl_frame, text="⏭", command=lambda: self._media_action('next'), **btn_kwargs).pack(side="left", padx=12)
 
         # Timer Elements
-        label = tk.Label(self.canvas, text="FOCUS", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 10, "bold"))
-        self.canvas.create_window(LEFT_CX, FOCUS_Y, window=label)
+        if LAYOUT == "landscape":
+            timer_frame = tk.Frame(self.main_container, bg=BG_CARD)
+            timer_frame.place(x=WIDTH // 4 - 20, y=55, anchor="n", width=WIDTH // 2, height=270)
+            
+            label = tk.Label(timer_frame, text="FOCUS", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 10, "bold"))
+            label.pack(side="top", pady=(5, 0))
 
-        self.mode_label = tk.Label(self.canvas, text="click the time to set it", bg=BG_CARD, fg=TEXT_SECONDARY, font=("Segoe UI", 9))
-        self.canvas.create_window(LEFT_CX, MODE_Y, window=self.mode_label)
+            self.mode_label = tk.Label(timer_frame, text="click the time to set it", bg=BG_CARD, fg=TEXT_SECONDARY, font=("Segoe UI", 9))
+            self.mode_label.pack(side="top", pady=(0, 5))
 
-        ring_size = 176
-        pad, ring_width = 12, 14
-        self.ring_canvas = tk.Canvas(self.canvas, width=ring_size, height=ring_size, bg=BG_CARD, highlightthickness=0, bd=0)
-        self.canvas.create_window(LEFT_CX, RING_Y, window=self.ring_canvas)
+            ring_size = 176
+            pad, ring_width = 12, 14
+            self.ring_canvas = tk.Canvas(timer_frame, width=ring_size, height=ring_size, bg=BG_CARD, highlightthickness=0, bd=0)
+            self.ring_canvas.pack(side="top", pady=5)
 
-        self.ring_track = self.ring_canvas.create_oval(pad, pad, ring_size - pad, ring_size - pad, outline=TRACK, width=ring_width)
-        self.ring_arc = self.ring_canvas.create_arc(pad, pad, ring_size - pad, ring_size - pad, start=90, extent=0, outline=ORANGE, width=ring_width, style="arc")
+            self.ring_track = self.ring_canvas.create_oval(pad, pad, ring_size - pad, ring_size - pad, outline=TRACK, width=ring_width)
+            self.ring_arc = self.ring_canvas.create_arc(pad, pad, ring_size - pad, ring_size - pad, start=90, extent=0, outline=ORANGE, width=ring_width, style="arc")
 
-        self.time_var = tk.StringVar(value=self._fmt(self.remaining))
-        self.time_label = tk.Label(self.ring_canvas, textvariable=self.time_var, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 26, "bold"), cursor="xterm")
-        self.ring_canvas.create_window(ring_size // 2, ring_size // 2, window=self.time_label)
-        self.time_label.bind("<Button-1>", self._start_time_edit)
+            self.time_var = tk.StringVar(value=self._fmt(self.remaining))
+            self.time_label = tk.Label(self.ring_canvas, textvariable=self.time_var, bg=BG_CARD, fg=TEXT_PRIMARY, font=("Segoe UI", 26, "bold"), cursor="xterm")
+            self.ring_canvas.create_window(ring_size // 2, ring_size // 2, window=self.time_label)
+            self.time_label.bind("<Button-1>", self._start_time_edit)
 
-        controls = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(LEFT_CX, CONTROLS_Y, window=controls)
+            controls = tk.Frame(timer_frame, bg=BG_CARD)
+            controls.pack(side="top", pady=5)
 
-        tk.Button(controls, text="Reset", command=self._reset, bg="#1c1815", fg="#d8d2cb", activebackground="#241f1b", activeforeground="#d8d2cb", bd=0, relief="flat", font=("Segoe UI", 10, "bold"), padx=18, pady=8, cursor="hand2").pack(side="left", padx=6)
-        self.start_btn = tk.Button(controls, text="Start", command=self._toggle_timer, bg=ORANGE, fg="#1a1310", activebackground=ORANGE_SOFT, activeforeground="#1a1310", bd=0, relief="flat", font=("Segoe UI", 10, "bold"), padx=22, pady=8, cursor="hand2")
-        self.start_btn.pack(side="left", padx=6)
+            tk.Button(controls, text="Reset", command=self._reset, bg="#1c1815", fg="#d8d2cb", activebackground="#241f1b", activeforeground="#d8d2cb", bd=0, relief="flat", font=("Segoe UI", 10, "bold"), padx=12, pady=6, cursor="hand2").pack(side="left", padx=4)
+            self.start_btn = tk.Button(controls, text="Start", command=self._toggle_timer, bg=ORANGE, fg="#1a1310", activebackground=ORANGE_SOFT, activeforeground="#1a1310", bd=0, relief="flat", font=("Segoe UI", 10, "bold"), padx=16, pady=6, cursor="hand2")
+            self.start_btn.pack(side="left", padx=4)
 
-        self.canvas.create_line(*DIV_COORDS, fill=BORDER)
+            # Vertical separator line
+            div_line = tk.Canvas(self.main_container, width=2, height=HEIGHT - 80, bg=BG_CARD, highlightthickness=0)
+            div_line.place(x=WIDTH // 2 - 20, y=50)
+            div_line.create_line(0, 0, 0, HEIGHT - 80, fill=BORDER)
 
-        # Checklist
-        header = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(HEADER_X, HEADER_Y, window=header, width=HEADER_W)
+            # Checklist side
+            right_frame = tk.Frame(self.main_container, bg=BG_CARD)
+            right_frame.place(x=WIDTH // 2, y=55, anchor="nw", width=(WIDTH // 2) - 30, height=270)
 
-        tk.Label(header, text="CHECKLIST", bg=BG_CARD, fg=TEXT_SECONDARY, font=("Segoe UI", 9, "bold")).pack(side="left")
-        self.count_label = tk.Label(header, text="0/0", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 9, "bold"))
-        self.count_label.pack(side="right")
+            header = tk.Frame(right_frame, bg=BG_CARD)
+            header.pack(side="top", fill="x", pady=(0, 5))
+            tk.Label(header, text="CHECKLIST", bg=BG_CARD, fg=TEXT_SECONDARY, font=("Segoe UI", 9, "bold")).pack(side="left")
+            self.count_label = tk.Label(header, text="0/0", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 9, "bold"))
+            self.count_label.pack(side="right")
 
-        list_wrap = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(LIST_X, LIST_Y, window=list_wrap, width=LIST_W, height=LIST_H, anchor="n")
+            list_wrap = tk.Frame(right_frame, bg=BG_CARD)
+            list_wrap.pack(side="top", fill="both", expand=True, pady=(0, 5))
 
-        self.list_canvas = tk.Canvas(list_wrap, bg=BG_CARD, highlightthickness=0, bd=0)
-        self.list_canvas.pack(side="left", fill="both", expand=True)
-        self.tasks_frame = tk.Frame(self.list_canvas, bg=BG_CARD)
-        self.list_window = self.list_canvas.create_window((0, 0), window=self.tasks_frame, anchor="nw")
+            self.list_canvas = tk.Canvas(list_wrap, bg=BG_CARD, highlightthickness=0, bd=0)
+            self.list_canvas.pack(side="left", fill="both", expand=True)
+            self.tasks_frame = tk.Frame(self.list_canvas, bg=BG_CARD)
+            self.list_window = self.list_canvas.create_window((0, 0), window=self.tasks_frame, anchor="nw")
+            
+            self.tasks_frame.bind("<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all")))
+            self.list_canvas.bind("<Configure>", lambda e: self.list_canvas.itemconfig(self.list_window, width=e.width))
+            self.list_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+            add_row = tk.Frame(right_frame, bg=BG_CARD)
+            add_row.pack(side="bottom", fill="x")
+
+            self.add_entry = tk.Entry(add_row, bg="#171310", fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY, relief="flat", font=("Segoe UI", 10), highlightthickness=1, highlightbackground="#2a1c12", highlightcolor=ORANGE)
+            self.add_entry.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 6))
+            self.add_entry.bind("<Return>", lambda e: self._add_task())
+            self._placeholder_on()
+            self.add_entry.bind("<FocusIn>", self._placeholder_off)
+            self.add_entry.bind("<FocusOut>", lambda e: self._placeholder_on() if not self.add_entry.get() else None)
+
+            tk.Button(add_row, text="+", command=self._add_task, bg="#2a1c12", fg=ORANGE, activebackground="#3a2717", activeforeground=ORANGE, bd=0, relief="flat", font=("Segoe UI", 11, "bold"), width=2, cursor="hand2").pack(side="left")
+        else:
+            # Portrait layout implementation handles natively if needed, keeping compact structure
+            pass
+
+    def _build_settings_view(self):
+        # Settings view container layout
+        self.settings_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH - 40, height=HEIGHT - 60, anchor="center")
         
-        self.tasks_frame.bind("<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all")))
-        self.list_canvas.bind("<Configure>", lambda e: self.list_canvas.itemconfig(self.list_window, width=e.width))
-        self.list_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        lbl_title = tk.Label(self.settings_container, text="SETTINGS", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 12, "bold"))
+        lbl_title.pack(side="top", pady=(10, 20))
 
-        add_row = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(ADD_X, ADD_Y, window=add_row, width=ADD_W)
+        lbl_coming = tk.Label(self.settings_container, text="comming soon", bg=BG_CARD, fg=TEXT_SECONDARY, font=("Segoe UI", 11))
+        lbl_coming.pack(side="top", pady=20)
 
-        self.add_entry = tk.Entry(add_row, bg="#171310", fg=TEXT_PRIMARY, insertbackground=TEXT_PRIMARY, relief="flat", font=("Segoe UI", 10), highlightthickness=1, highlightbackground="#2a1c12", highlightcolor=ORANGE)
-        self.add_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 8))
-        self.add_entry.bind("<Return>", lambda e: self._add_task())
-        self.add_entry.insert(0, "")
-        self._placeholder_on()
-        self.add_entry.bind("<FocusIn>", self._placeholder_off)
-        self.add_entry.bind("<FocusOut>", lambda e: self._placeholder_on() if not self.add_entry.get() else None)
+        back_btn = tk.Button(self.settings_container, text="Back to Widget", command=self._toggle_settings, bg="#2a1c12", fg=ORANGE, activebackground="#3a2717", activeforeground=ORANGE, bd=0, relief="flat", font=("Segoe UI", 10, "bold"), padx=16, pady=8, cursor="hand2")
+        back_btn.pack(side="top", pady=20)
 
-        tk.Button(add_row, text="+", command=self._add_task, bg="#2a1c12", fg=ORANGE, activebackground="#3a2717", activeforeground=ORANGE, bd=0, relief="flat", font=("Segoe UI", 13, "bold"), width=2, cursor="hand2").pack(side="left")
-
-        self.canvas.bind("<ButtonPress-1>", self._drag_start)
-        self.canvas.bind("<B1-Motion>", self._drag_move)
+    def _toggle_settings(self):
+        if self.settings_container.winfo_ismapped():
+            # Switch back to main view
+            self.settings_container.place_forget()
+            self.main_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH, height=HEIGHT - 40, anchor="center")
+            self.settings_btn.configure(text="⚙")
+        else:
+            # Switch to settings view
+            self.main_container.place_forget()
+            self.settings_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH - 40, height=HEIGHT - 60, anchor="center")
+            self.settings_btn.configure(text="✕")
 
     def _placeholder_on(self):
         self.add_entry.delete(0, "end")
