@@ -353,6 +353,10 @@ class FocusWidget:
             self.workspace.pack(side="top", fill="both", expand=True)
 
     def _on_resize(self, event):
+        # 1. ADD THIS CHECK: Only resize if the event is from the root window itself!
+        if event.widget != self.root:
+            return
+
         w, h = event.width, event.height
         pts = rounded_rect_points(1, 1, w - 1, h - 1, RADIUS)
         self.canvas.coords(self.bg_polygon, *pts)
