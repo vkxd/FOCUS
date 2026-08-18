@@ -352,8 +352,7 @@ class FocusWidget:
             pass
 
     def _build_settings_view(self):
-        # Settings view container layout
-        self.settings_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH - 40, height=HEIGHT - 60, anchor="center")
+        # FIXED: Removed self.settings_container.place(...) so it doesn't open by default.
         
         lbl_title = tk.Label(self.settings_container, text="SETTINGS", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 12, "bold"))
         lbl_title.pack(side="top", pady=(10, 20))
