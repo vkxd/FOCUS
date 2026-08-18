@@ -492,7 +492,7 @@ class FocusWidget:
         else:
             for i, task in enumerate(self.tasks):
                 row = tk.Frame(self.tasks_frame, bg=BG_CARD)
-                row.pack(fill="x", pady=3)
+                row.pack(fill="x", pady=3
 
                 dot = tk.Canvas(row, width=17, height=17, bg=BG_CARD, highlightthickness=0, bd=0, cursor="hand2")
                 dot.pack(side="left", padx=(2, 8))
