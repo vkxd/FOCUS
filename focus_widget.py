@@ -240,7 +240,7 @@ class FocusWidget:
         self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.configure(fg=ORANGE))
         self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.configure(fg=TEXT_MUTED))
 
-        # Main Content Container (FIXED: Using .place() instead of create_window)
+        # Main Content Container (FIXED: Using .place() to avoid geometry manager conflicts)
         self.main_container = tk.Frame(self.canvas, bg=BG_CARD)
         self.main_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH, height=HEIGHT - 40, anchor="center")
 
@@ -259,8 +259,6 @@ class FocusWidget:
     def _build_main_view(self):
         # Media Player
         music_frame = tk.Frame(self.main_container, bg=BG_CARD)
-        music_frame.place(x=0, y=10, width=WIDTH, anchor="n") # Adjusted relative layout positioning
-        # To make it safe inside main_container bounds, use pack/place securely:
         music_frame.pack(side="top", pady=(5, 0))
 
         self.track_var = tk.StringVar(value=getattr(self, 'media_status', 'Loading...'))
@@ -324,18 +322,7 @@ class FocusWidget:
             self.count_label = tk.Label(header, text="0/0", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 9, "bold"))
             self.count_label.pack(side="right")
 
-            list_wrap = tk.Frame(right_frame, bg=BG_CARD)
-            list_wrap.pack(side="top", fill="both", expand=True, pady=(0, 5))
-
-            self.list_canvas = tk.Canvas(list_wrap, bg=BG_CARD, highlightthickness=0, bd=0)
-            self.list_canvas.pack(side="left", fill="both", expand=True)
-            self.tasks_frame = tk.Frame(self.list_canvas, bg=BG_CARD)
-            self.list_window = self.list_canvas.create_window((0, 0), window=self.tasks_frame, anchor="nw")
-            
-            self.tasks_frame.bind("<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all")))
-            self.list_canvas.bind("<Configure>", lambda e: self.list_canvas.itemconfig(self.list_window, width=e.width))
-            self.list_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
-
+            # 1. Pack add_row FIRST so it anchors safely to the bottom and stays visible
             add_row = tk.Frame(right_frame, bg=BG_CARD)
             add_row.pack(side="bottom", fill="x")
 
@@ -347,12 +334,24 @@ class FocusWidget:
             self.add_entry.bind("<FocusOut>", lambda e: self._placeholder_on() if not self.add_entry.get() else None)
 
             tk.Button(add_row, text="+", command=self._add_task, bg="#2a1c12", fg=ORANGE, activebackground="#3a2717", activeforeground=ORANGE, bd=0, relief="flat", font=("Segoe UI", 11, "bold"), width=2, cursor="hand2").pack(side="left")
+
+            # 2. Pack list_wrap AFTER so it dynamically fills remaining middle space
+            list_wrap = tk.Frame(right_frame, bg=BG_CARD)
+            list_wrap.pack(side="top", fill="both", expand=True, pady=(0, 5))
+
+            self.list_canvas = tk.Canvas(list_wrap, bg=BG_CARD, highlightthickness=0, bd=0)
+            self.list_canvas.pack(side="left", fill="both", expand=True)
+            self.tasks_frame = tk.Frame(self.list_canvas, bg=BG_CARD)
+            self.list_window = self.list_canvas.create_window((0, 0), window=self.tasks_frame, anchor="nw")
+            
+            self.tasks_frame.bind("<Configure>", lambda e: self.list_canvas.configure(scrollregion=self.list_canvas.bbox("all")))
+            self.list_canvas.bind("<Configure>", lambda e: self.list_canvas.itemconfig(self.list_window, width=e.width))
+            self.list_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         else:
-            # Portrait layout implementation handles natively if needed, keeping compact structure
             pass
 
     def _build_settings_view(self):
-        # FIXED: Removed self.settings_container.place(...) so it doesn't open by default.
+        # FIXED: Removed .place() call here so it doesn't open by default on startup.
         
         lbl_title = tk.Label(self.settings_container, text="SETTINGS", bg=BG_CARD, fg=ORANGE, font=("Segoe UI", 12, "bold"))
         lbl_title.pack(side="top", pady=(10, 20))
