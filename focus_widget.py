@@ -240,9 +240,9 @@ class FocusWidget:
         self.settings_btn.bind("<Enter>", lambda e: self.settings_btn.configure(fg=ORANGE))
         self.settings_btn.bind("<Leave>", lambda e: self.settings_btn.configure(fg=TEXT_MUTED))
 
-        # Main Content Container
+        # Main Content Container (FIXED: Using .place() instead of create_window)
         self.main_container = tk.Frame(self.canvas, bg=BG_CARD)
-        self.canvas.create_window(WIDTH // 2, HEIGHT // 2 + 10, window=self.main_container, width=WIDTH, height=HEIGHT - 40)
+        self.main_container.place(x=WIDTH // 2, y=HEIGHT // 2 + 10, width=WIDTH, height=HEIGHT - 40, anchor="center")
 
         # Settings Content Container
         self.settings_container = tk.Frame(self.canvas, bg=BG_CARD)
