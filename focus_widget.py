@@ -5,7 +5,6 @@ import threading
 import asyncio
 import tkinter as tk
 from tkinter import font as tkfont
-from tkinter import colorchooser
 
 try:
     from winsdk.windows.media.control import GlobalSystemMediaTransportControlsSessionManager
@@ -52,8 +51,8 @@ class FocusWidget:
         # Accent Color Configuration
         self.highlight_color = "#ff7a1a"
         
-        # Taskbar Layout Options: "Top", "Bottom", "Left", "Right", "Hidden"
-        self.taskbar_position = tk.StringVar(value="Top")
+        # Explicitly tie StringVar to root so Radiobuttons track it properly
+        self.taskbar_position = tk.StringVar(self.root, value="Top")
 
         self.tasks = [Task("Deep work block"), Task("Clear inbox")]
 
@@ -64,7 +63,6 @@ class FocusWidget:
         self._setup_window()
         self._build_ui()
         
-        # Force initial state to main view on load
         self.settings_visible = False
         self._apply_layout_change()
         self._render_timer()
@@ -139,7 +137,7 @@ class FocusWidget:
         root.overrideredirect(True)
         root.attributes("-topmost", True)
         root.geometry("600x390+200+200")
-        root.minsize(400, 300)  # Allow scaling
+        root.minsize(400, 300)
         root.attributes("-alpha", TRANSPARENCY)
 
         if self.is_windows:
@@ -156,7 +154,6 @@ class FocusWidget:
         )
         self.canvas.pack(fill="both", expand=True)
 
-        # Background card polygon for smooth rounded corners
         self.bg_polygon = self.canvas.create_polygon(0, 0, 0, 0, fill=BG_CARD, outline=BORDER, width=1)
 
         # Drag bar / Window Controls
@@ -277,7 +274,6 @@ class FocusWidget:
         self.settings_frame = tk.Frame(self.canvas, bg=BG_CARD)
         self._build_settings_view()
 
-        # Handle Resizing & Scaling dynamically
         self.root.bind("<Configure>", self._on_resize)
 
     def _build_settings_view(self):
@@ -320,7 +316,6 @@ class FocusWidget:
         if new_color and (new_color.startswith("#") and len(new_color) in (4, 7)):
             self.highlight_color = new_color
             
-            # Update dynamic elements fg/bg
             self.lbl_focus.configure(fg=self.highlight_color)
             self.count_label.configure(fg=self.highlight_color)
             self.start_btn.configure(bg=self.highlight_color)
@@ -341,19 +336,18 @@ class FocusWidget:
             self.media_frame.pack(side="top", fill="x", pady=(0, 5))
             self.workspace.pack(side="top", fill="both", expand=True)
         elif pos == "Bottom":
-            self.workspace.pack(side="top", fill="both", expand=True)
             self.media_frame.pack(side="bottom", fill="x", pady=(5, 0))
+            self.workspace.pack(side="top", fill="both", expand=True)
         elif pos == "Left":
             self.media_frame.pack(side="left", fill="y", padx=(0, 10))
             self.workspace.pack(side="left", fill="both", expand=True)
         elif pos == "Right":
-            self.workspace.pack(side="left", fill="both", expand=True)
             self.media_frame.pack(side="right", fill="y", padx=(10, 0))
+            self.workspace.pack(side="left", fill="both", expand=True)
         elif pos == "Hidden":
             self.workspace.pack(side="top", fill="both", expand=True)
 
     def _on_resize(self, event):
-        # 1. ADD THIS CHECK: Only resize if the event is from the root window itself!
         if event.widget != self.root:
             return
 
@@ -367,7 +361,7 @@ class FocusWidget:
         if self.settings_visible:
             self.canvas.coords(self.content_window, 10, 45)
             self.canvas.itemconfig(self.content_window, width=w - 20, height=h - 55)
-            self.settings_frame.place(x=0, y=0, width=w - 20, height=h - 55)
+            self.settings_frame.place(x=10, y=45, width=w - 20, height=h - 55)
         else:
             self.settings_frame.place_forget()
             self.canvas.coords(self.content_window, 10, 45)
@@ -376,12 +370,12 @@ class FocusWidget:
     def _toggle_settings(self):
         self.settings_visible = not self.settings_visible
         if self.settings_visible:
-            self.content_frame.pack_forget()
-            self.settings_frame.place(x=0, y=0, width=self.root.winfo_width() - 20, height=self.root.winfo_height() - 55)
+            self.canvas.itemconfig(self.content_window, state="hidden")
+            self.settings_frame.place(x=10, y=45, width=self.root.winfo_width() - 20, height=self.root.winfo_height() - 55)
             self.settings_btn.configure(text="✕")
         else:
             self.settings_frame.place_forget()
-            self.content_frame.pack(fill="both", expand=True)
+            self.canvas.itemconfig(self.content_window, state="normal")
             self.settings_btn.configure(text="⚙")
 
     def _placeholder_on(self):
